@@ -1,10 +1,10 @@
 use ic_cdk::api;
 use ic_cdk::api::{stable, trap};
-use ic_cdk::export::candid::{candid_method, CandidType, Nat, Decode, Encode};
+use ic_cdk::export::candid::{candid_method, CandidType, Nat, Decode, Encode, Deserialize};
 use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 
 mod bucket;
 
@@ -15,6 +15,7 @@ struct NftInfo {
     read_offset: u64,
     write_offset: u64,
     nft_data: Vec<u8>,
+    read_write : u64,
 }
 
 
@@ -24,6 +25,7 @@ impl Default for NftInfo {
             read_offset: 0,
             nft_data: vec![],
             write_offset: 0,
+            read_write: 0
         }
     }
 }
@@ -44,7 +46,7 @@ fn init() {
 
 #[ic_cdk_macros::query]
 fn greet(name: String) -> String {
-    format!("Hello 335566, {}!", name)
+    format!("Hello yy bb 5 00 r335566, {}!", name)
 }
 
 // NOTE:
@@ -56,9 +58,9 @@ fn pre_upgrade() {
         nftinfo.borrow().clone()
     });
 
-    let bytes = bincode::serialize::<NftInfo>(&_nftinfo).unwrap();
+    // let bytes = bincode::serialize::<NftInfo>(&_nftinfo).unwrap();
 
-    // let bytes = Encode!(&_nftinfo).unwrap();
+    let bytes = Encode!(&_nftinfo).unwrap();
     Bucket::pre_upgrade(bytes);
 }
 
@@ -67,8 +69,8 @@ fn post_upgrade() {
     let bytes = Bucket::post_upgrade();
 
     NFTINFO.with(|nftinfo| {
-        *nftinfo.borrow_mut() = bincode::deserialize(&bytes).unwrap()
-        // *nftinfo.borrow_mut() = Decode!(&bytes, NftInfo).unwrap();
+        // *nftinfo.borrow_mut() = bincode::deserialize(&bytes).unwrap()
+        *nftinfo.borrow_mut() = Decode!(&bytes, NftInfo).unwrap();
     });
 }
 

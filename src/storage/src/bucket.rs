@@ -29,16 +29,16 @@ pub enum Error {
 
 #[derive(CandidType, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Bucket {
-    pub(crate) upgradable: bool,
-    pub(crate) offset: u64,
-    pub(crate) assets: HashMap<String, Vec<(u64, u64)>>, //(key,(offset len))
+    upgradable: bool,
+    offset: u64,
+    assets: HashMap<String, Vec<(u64, u64)>>, //(key,(offset len))
 }
 
 impl Default for Bucket {
     fn default() -> Self {
         Bucket {
             upgradable: true,
-            offset: 0,
+            offset: RESERVED_SPACE,
             assets: HashMap::new(),
         }
     }
@@ -287,10 +287,9 @@ impl Bucket {
 
     // grow SM memory pages of size "size"
     fn _grow_stable_memory_page(bucket: &mut Bucket, size: u64) {
-        if bucket.offset == 0 {
+        if stable::stable64_size() == 0 {
             // 预留的空间分配好
             let ret = stable::stable64_grow(RESERVED_SPACE / MAX_PAGE_BYTE);
-            bucket.offset = RESERVED_SPACE;
         }
 
         let available_mem = stable::stable64_size() * MAX_PAGE_BYTE - bucket.offset;
