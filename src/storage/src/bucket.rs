@@ -38,7 +38,7 @@ impl Default for Bucket {
     fn default() -> Self {
         Bucket {
             upgradable: true,
-            offset: RESERVED_SPACE,
+            offset: 0,
             assets: HashMap::new(),
         }
     }
@@ -50,7 +50,7 @@ thread_local!(
 
 impl Bucket {
     pub fn get_bucket() -> Bucket {
-        BUCKET.with( | bucket| {
+        BUCKET.with(|bucket| {
             bucket.borrow().clone()
         })
     }
@@ -66,10 +66,10 @@ impl Bucket {
             assert!(false)
         }
     }
-    pub fn update_self_to_stable(&self) {
+    pub fn update_self_to_stable(&mut self) {
         let bytes = bincode::serialize::<Bucket>(&self).unwrap();
         let bytes_len = bytes.len() as u64;
-        Bucket::_grow_stable_memory_page(&self, 0);
+        Bucket::_grow_stable_memory_page(self, 0);
         let len_bytes = Vec::from(bytes_len.to_be_bytes());
 
         Bucket::_storage_data(0, len_bytes.clone());
@@ -214,8 +214,8 @@ impl Bucket {
                 trap(&*format!("pre_upgrade err {:?}", err))
             }
         };
-        let bucket = BUCKET.with(|bucket| bucket.borrow().clone());
-        Bucket::update_self_to_stable(&bucket);
+        let mut bucket = BUCKET.with(|bucket| bucket.borrow_mut().clone());
+        Bucket::update_self_to_stable(&mut bucket);
     }
 
     pub fn post_upgrade() -> Vec<u8> {
@@ -286,10 +286,11 @@ impl Bucket {
     }
 
     // grow SM memory pages of size "size"
-    fn _grow_stable_memory_page(bucket: &Bucket, size: u64) {
-        if bucket.offset == RESERVED_SPACE {
+    fn _grow_stable_memory_page(bucket: &mut Bucket, size: u64) {
+        if bucket.offset == 0 {
             // 预留的空间分配好
-            let ret = stable::stable64_grow(RESERVED_SPACE / MAX_PAGE_BYTE + 1);
+            let ret = stable::stable64_grow(RESERVED_SPACE / MAX_PAGE_BYTE);
+            bucket.offset = RESERVED_SPACE;
         }
 
         let available_mem = stable::stable64_size() * MAX_PAGE_BYTE - bucket.offset;
