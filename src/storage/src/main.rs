@@ -1,15 +1,16 @@
 use ic_cdk::api;
 use ic_cdk::api::{stable, trap};
-use ic_cdk::export::candid::{candid_method, CandidType, Deserialize, Nat, Decode, Encode};
+use ic_cdk::export::candid::{candid_method, CandidType, Nat, Decode, Encode};
 use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use serde::{Deserialize, Serialize};
 
 mod bucket;
 
 use bucket::Bucket;
 
-#[derive(CandidType, Deserialize, Clone)]
+#[derive(CandidType, Deserialize, Serialize, Clone)]
 struct NftInfo {
     read_offset: u64,
     write_offset: u64,
@@ -43,7 +44,7 @@ fn init() {
 
 #[ic_cdk_macros::query]
 fn greet(name: String) -> String {
-    format!("Hello 33, {}!", name)
+    format!("Hello 335566, {}!", name)
 }
 
 // NOTE:
@@ -55,7 +56,9 @@ fn pre_upgrade() {
         nftinfo.borrow().clone()
     });
 
-    let bytes = Encode!(&_nftinfo).unwrap();
+    let bytes = bincode::serialize::<NftInfo>(&_nftinfo).unwrap();
+
+    // let bytes = Encode!(&_nftinfo).unwrap();
     Bucket::pre_upgrade(bytes);
 }
 
@@ -64,7 +67,8 @@ fn post_upgrade() {
     let bytes = Bucket::post_upgrade();
 
     NFTINFO.with(|nftinfo| {
-        *nftinfo.borrow_mut() = Decode!(&bytes, NftInfo).unwrap();
+        *nftinfo.borrow_mut() = bincode::deserialize(&bytes).unwrap()
+        // *nftinfo.borrow_mut() = Decode!(&bytes, NftInfo).unwrap();
     });
 }
 
@@ -84,7 +88,7 @@ fn upload_data(num: Nat) {
             match ret {
                 Ok(..) => {}
                 Err(err) => {
-                    api::print(format!("upload 44tttttn9 data err:{:?}", err));
+                    api::print(format!("upload tt7744tttttn9 66 data err:{:?}", err));
                     assert!(false)
                 }
             }
@@ -104,7 +108,7 @@ fn upload_big_data(num: u32) {
     let ret = Bucket::put(name, data);
     match ret {
         Ok(..) => {}
-        Err(err) => api::print(format!("upload data 45 dddddgg  err:{:?}", err)),
+        Err(err) => api::print(format!("upload data  err:{:?}", err)),
     }
 }
 
