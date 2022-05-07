@@ -3,10 +3,8 @@ name = "bucket"
 version = "0.1.0"
 edition = "2021"
 authors = ["Xingwu Wang <wxw1198@gmail.com>"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
+description = "A simple library using stable memory is implemented using rust"
+license = "MIT"
 
 [dependencies]
 candid = "0.7.4"
