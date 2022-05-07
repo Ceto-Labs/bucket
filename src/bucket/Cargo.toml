@@ -5,6 +5,8 @@ edition = "2021"
 authors = ["Xingwu Wang <wxw1198@gmail.com>"]
 description = "A simple library using stable memory is implemented using rust"
 license = "MIT"
+repository = "https://github.com/Ceto-Labs/bucket"
+readme = "./README.md"
 
 [dependencies]
 candid = "0.7.4"
