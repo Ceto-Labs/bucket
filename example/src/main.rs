@@ -1,23 +1,19 @@
 use ic_cdk::api;
-use ic_cdk::api::{stable, trap};
 use ic_cdk::export::candid::{candid_method, CandidType, Nat, Decode, Encode, Deserialize};
 use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 // use serde::{Deserialize, Serialize};
 
-mod bucket;
-
 use bucket::Bucket;
 
-#[derive(CandidType, Deserialize, Serialize, Clone)]
+#[derive(CandidType, Deserialize, Clone)]
 struct NftInfo {
     read_offset: u64,
     write_offset: u64,
     nft_data: Vec<u8>,
     read_write : u64,
 }
-
 
 impl Default for NftInfo {
     fn default() -> Self {
@@ -38,7 +34,7 @@ thread_local!(
 #[candid_method(init)]
 fn init() {
     NFTINFO.with(|nftinfo| {
-        let data = [0].repeat(10485760);
+        let data = [0].repeat(104857600);
         nftinfo.borrow_mut().nft_data.extend(data.iter())
     });
 
@@ -84,7 +80,7 @@ fn upload_data(num: Nat) {
     while i <= num {
         let mut j = 0;
         while j < 16 {
-            let data: Vec<u8> = vec![i as u8; (64 * 64) as usize];
+            let data: Vec<u8> = vec![i as u8; (64 * 1024) as usize];
             let name = format!("{}.png", i as u8);
             let ret = Bucket::put(name, data);
             match ret {
@@ -106,7 +102,6 @@ fn upload_big_data(num: u32) {
     let data: Vec<u8> = vec![1 as u8; (num * 1024 * 1024) as usize];
 
     let name = format!("{}.png", 0);
-
     let ret = Bucket::put(name, data);
     match ret {
         Ok(..) => {}
@@ -148,28 +143,6 @@ fn check_data(start: u8, end: u8) {
             break;
         }
         i += 1;
-    }
-}
-
-#[query(name = "getBlockNum")]
-#[candid_method(query, rename = "getBlockNum")]
-fn get_block_num() -> u64 {
-    let mut i = 0;
-    while i < 1000000 {
-        let key = format!("{}", i);
-        Bucket::insert_test(key.clone());
-        i += 1;
-        api::print(format!("i:{}, len:{}", i, key.len()));
-    }
-    i
-}
-
-#[query]
-fn test_bucket() {
-    let ret = Bucket::get_bucket();
-    api::print(format!("offset : {}", ret.offset));
-    for (k, v) in ret.assets {
-        api::print(format!("k: {}, len: {}", k, v.len()));
     }
 }
 

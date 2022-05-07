@@ -1,16 +1,16 @@
 [package]
-name = "storage"
+name = "bucket"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
+authors = ["Xingwu Wang <wxw1198@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-#[workspace]
+[lib]
 
 [dependencies]
 candid = "0.7.4"
 ic-cdk = "0.5.0"
-ic-cdk-macros = "0.5.0"
 serde = "1.0.136"
 num-traits = "0.2.14"
 serde_bytes = "0.11.5"

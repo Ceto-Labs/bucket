@@ -1,6 +1,5 @@
-service : {
+service : () -> {
   checkData : (nat8, nat8) -> ();
-  getBlockNum : () -> (nat64) query;
   uploadBigData : (nat32) -> ();
   uploadData : (nat) -> ();
 }
