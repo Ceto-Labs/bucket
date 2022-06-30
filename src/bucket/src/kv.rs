@@ -1,38 +1,37 @@
-use crate::*;
+use crate::types::*;
 use bincode;
-use ic_cdk::export::candid::{CandidType, Nat};
-use ic_cdk::{trap};
-use serde::{Deserialize, Serialize};
+// use ic_cdk::export::candid::{CandidType, Nat};
+// use ic_cdk::{trap};
+// use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 mod kv {
     use super::*;
     thread_local!(
-        static KV: RefCell<kv> = RefCell::new(kv::default());
+        static KV: RefCell<Kv> = RefCell::new(Kv::default());
     );
 
-    pub fn with<T, F: FnOnce(&Ledger) -> T>(f: F) -> T {
+    pub fn with<T, F: FnOnce(&Kv) -> T>(f: F) -> T {
         KV.with(|kv| f(&kv.borrow()))
     }
 
-    pub fn with_mut<T, F: FnOnce(&mut Ledger) -> T>(f: F) -> T {
+    pub fn with_mut<T, F: FnOnce(&mut Kv) -> T>(f: F) -> T {
         KV.with(|kv| f(&mut kv.borrow_mut()))
     }
 
-    impl kv{
+    impl Kv{
         // ==================================================================================================
         // Auxiliary query  api
         // ==================================================================================================
         pub fn get_keys(&self) -> Vec<String> {
-            self.kv_set.into_keys().collect()
+            self.kv_set.clone().into_keys().collect()
         }
 
         // ==================================================================================================
         // danger  api
         // ==================================================================================================
         /// The index is deleted, but the data is still stored in stable
-        pub fn del_key(key: String) {
+        pub fn del_key(&self,key: String) {
 
         }
 
@@ -40,7 +39,7 @@ mod kv {
         // core api
         // ==================================================================================================
 
-        // pub fn put(key: String, value: Vec<u8>) -> Result<(), Error> {
+        pub fn put(key: String, value: Vec<u8>) -> Result<(), KvError> {
         //     BUCKET.with(|bucket| {
         //         let mut bucket = bucket.borrow_mut();
         //         match bucket._get_field(value.len() as u64) {
@@ -57,21 +56,21 @@ mod kv {
         //
         //                 // todo check 索引大小，否则assert!
         //                 bucket._check_self_bytes_len();
-        //                 Ok(())
+                        Ok(())
         //             }
         //             Err(err) => {
         //                 return Err(err);
         //             }
         //         }
         //     })
-        // }
+        }
         //
-        // pub fn get(key: String) -> Result<Vec<Vec<u8>>, Error> {
+        pub fn get(key: String) -> Result<Vec<Vec<u8>>, KvError> {
         //     BUCKET.with(|bucket| {
         //         let bucket = bucket.borrow();
         //         match bucket.assets.get(&key) {
         //             None => {
-        //                 return Err(Error::InvalidKey);
+                        return Err(KvError::InvalidKey);
         //             }
         //             Some(field) => {
         //                 let mut res = vec![];
@@ -82,15 +81,15 @@ mod kv {
         //             }
         //         }
         //     })
-        // }
+        }
 
         // ==================================================================================================
         // upgrade
         // ==================================================================================================
-        /// NOTE:
-        /// If you plan to store gigabytes of state and upgrade the code,
-        /// Using put interface is a good option to consider
-        // pub fn pre_upgrade(buf: Vec<u8>) {
+        // NOTE:
+        // If you plan to store gigabytes of state and upgrade the code,
+        // Using put interface is a good option to consider
+        pub fn pre_upgrade(buf: Vec<u8>) {
         //     match Bucket::put(USER_DATA.into(), buf) {
         //         Ok(..) => {}
         //         Err(err) => {
@@ -102,9 +101,9 @@ mod kv {
         //             borrow_mut().
         //             _update_self_to_stable();
         //     });
-        // }
+        }
 
-        // pub fn post_upgrade() -> Vec<u8> {
+        pub fn post_upgrade() -> Vec<u8> {
         //     BUCKET.with(|bucket| {
         //         bucket.
         //             borrow_mut().
@@ -125,7 +124,8 @@ mod kv {
         //     });
         //
         //     buf
-        // }
+            vec![]
+        }
 
         // ==================================================================================================
         // private
