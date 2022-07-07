@@ -10,15 +10,24 @@ pub enum KvError {
     Other(String),
 }
 
-#[derive(CandidType, Serialize, Default, Debug, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Default, Debug, Clone)]
 pub struct Kv {
-    pub(crate) kv_set : HashMap<String,(Vec<u64>,u64)>, //key :(blocks/position)
+    pub(crate) kv_set: HashMap<String, (Vec<u64>, u64)>, //key :(blocks/position)
 }
 
-
-// #[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
-#[derive(CandidType, Default, Deserialize)]
+#[derive(CandidType, Deserialize, Serialize, Clone)]
 pub struct Layout {
     pub(crate) stable_blocks_count: u64,
-    pub(crate) bit_map: Vec<u8>,//8*10>>30/512
+    pub(crate) bit_map: Vec<u8>,//8*10>>30/512s
+    pub(crate) kv_block_size : u64,
 }
+
+#[derive(CandidType, Default, Deserialize, Serialize)]
+pub struct StableStruct {
+    pub(crate) layout: Layout,
+    pub(crate) kv: Kv,
+}
+
+
+
+

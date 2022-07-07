@@ -10,9 +10,9 @@ dfx canister create example
 
 dfx build example; dfx canister install example
 
-dfx canister call example uploadData '(2047:nat)'
+dfx canister call example uploadData '(256:nat)'
 
-dfx canister call example checkData '(0, 255)'
+dfx canister call example checkData '(0)'
 ```
 
 

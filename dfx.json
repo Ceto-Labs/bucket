@@ -1,7 +1,7 @@
 {
   "canisters": {
     "example": {
-      "candid": "example/storage.did",
+      "candid": "example/example.did",
       "package": "example",
       "type": "rust"
     }

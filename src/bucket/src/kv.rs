@@ -1,12 +1,15 @@
 use crate::types::*;
+use crate::layout::*;
+use crate::stable::*;
 use bincode;
-// use ic_cdk::export::candid::{CandidType, Nat};
-// use ic_cdk::{trap};
-// use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use crate::{layout, stable};
 
 mod kv {
     use super::*;
+    use std::cmp::min;
+    use ic_cdk::api;
+
     thread_local!(
         static KV: RefCell<Kv> = RefCell::new(Kv::default());
     );
@@ -19,219 +22,240 @@ mod kv {
         KV.with(|kv| f(&mut kv.borrow_mut()))
     }
 
-    impl Kv{
-        // ==================================================================================================
-        // Auxiliary query  api
-        // ==================================================================================================
+    impl Kv {
         pub fn get_keys(&self) -> Vec<String> {
             self.kv_set.clone().into_keys().collect()
         }
 
-        // ==================================================================================================
-        // danger  api
-        // ==================================================================================================
         /// The index is deleted, but the data is still stored in stable
-        pub fn del_key(&self,key: String) {
+        pub fn del(&mut self, key: &String) {
+            let value = self.kv_set.remove(key);
 
+            if let Some((blocks, _)) = value {
+                for block in blocks {
+                    layout::with_mut(|layout| {
+                        layout.free_block(block);
+                    });
+                }
+            }
         }
 
-        // ==================================================================================================
-        // core api
-        // ==================================================================================================
+        pub fn append(&mut self, key: &String, value: Vec<u8>) -> Result<(), KvError> {
+            let mut value = value;
 
-        pub fn put(key: String, value: Vec<u8>) -> Result<(), KvError> {
-        //     BUCKET.with(|bucket| {
-        //         let mut bucket = bucket.borrow_mut();
-        //         match bucket._get_field(value.len() as u64) {
-        //             Ok(field) => {
-        //                 match bucket.assets.get_mut(&key) {
-        //                     None => {
-        //                         bucket.assets.insert(key, vec![field.clone()]);
-        //                     }
-        //                     Some(pre_field) => {
-        //                         pre_field.push(field.clone());
-        //                     }
-        //                 }
-        //                 bucket._storage_data(field.0, value);
-        //
-        //                 // todo check 索引大小，否则assert!
-        //                 bucket._check_self_bytes_len();
-                        Ok(())
-        //             }
-        //             Err(err) => {
-        //                 return Err(err);
-        //             }
-        //         }
-        //     })
-        }
-        //
-        pub fn get(key: String) -> Result<Vec<Vec<u8>>, KvError> {
-        //     BUCKET.with(|bucket| {
-        //         let bucket = bucket.borrow();
-        //         match bucket.assets.get(&key) {
-        //             None => {
-                        return Err(KvError::InvalidKey);
-        //             }
-        //             Some(field) => {
-        //                 let mut res = vec![];
-        //                 for f in field.iter() {
-        //                     res.push(bucket._load_from_sm(f.clone()));
-        //                 }
-        //                 Ok(res)
-        //             }
-        //         }
-        //     })
+            api::print(format!("append ----- , key:{}, value:{:?}", key, self.kv_set.get(key)));
+
+            match self.kv_set.get_mut(key) {
+                Some((blocks, position)) => {
+                    api::print(format!("existed old :{:?}, {}", blocks, position));
+
+                    //剩余空间可以存储全部新来的数据
+                    let stable_position = layout::with_mut(|layout| {
+                        layout.get_position(blocks[blocks.len() - 1], *position)
+                    });
+
+                    let storage_data_len = min((layout::KV_BLOCK_SIZE - *position) as usize, value.len());
+                    storage_data(stable_position, value[0..storage_data_len].to_vec());
+                    value = value[(layout::KV_BLOCK_SIZE - *position) as usize..].to_owned();
+                    *position += value.len() as u64;
+
+                    if layout::KV_BLOCK_SIZE > *position {
+                        return Ok(());
+                    }
+                }
+                None => return self.put(key, value)
+            }
+
+            let (new_blocks, new_position) = match self._insert_data(value) {
+                Ok((new_blocks, new_position)) => {
+                    (new_blocks, new_position)
+                }
+                Err(err) => { return Err(err); }
+            };
+
+            let (blocks, position) = self.kv_set.get_mut(key).unwrap();
+            blocks.extend(new_blocks.clone());
+            // api::print(format!("new blocks: {:?}", new_blocks));
+            *position = new_position;
+            Ok(())
         }
 
-        // ==================================================================================================
-        // upgrade
-        // ==================================================================================================
-        // NOTE:
-        // If you plan to store gigabytes of state and upgrade the code,
-        // Using put interface is a good option to consider
-        pub fn pre_upgrade(buf: Vec<u8>) {
-        //     match Bucket::put(USER_DATA.into(), buf) {
-        //         Ok(..) => {}
-        //         Err(err) => {
-        //             trap(&*format!("pre_upgrade err {:?}", err))
-        //         }
-        //     };
-        //     BUCKET.with(|bucket| {
-        //         bucket.
-        //             borrow_mut().
-        //             _update_self_to_stable();
-        //     });
+        pub fn put(&mut self, key: &String, value: Vec<u8>) -> Result<(), KvError> {
+            if let Some(..) = self.kv_set.get(key) {
+                return Err(KvError::Other("key exist, please use func append() or del key first".into()));
+            }
+
+            match self._insert_data(value) {
+                Ok((blocks, position)) => {
+                    self.kv_set.insert(key.clone(), (blocks, position));
+                    Ok(())
+                }
+                Err(err) => { Err(err) }
+            }
         }
 
-        pub fn post_upgrade() -> Vec<u8> {
-        //     BUCKET.with(|bucket| {
-        //         bucket.
-        //             borrow_mut().
-        //             _update_self_from_stable()
-        //     });
-        //
-        //     let buf = match Bucket::get(USER_DATA.into()) {
-        //         Ok(vec) => { vec[0].clone() }
-        //         Err(_err) => {
-        //             trap(&*format!("bucket post upgrade err :{:?}", _err));
-        //         }
-        //     };
-        //
-        //     // Reclaim the storage space occupied by user data  when upgrade
-        //     BUCKET.with(|bucket| {
-        //         bucket.borrow_mut().offset -= buf.len() as u64;
-        //         bucket.borrow_mut().assets.remove(USER_DATA);
-        //     });
-        //
-        //     buf
-            vec![]
+        pub fn get(&self, key: &String) -> Result<Vec<u8>, KvError> {
+            match self.kv_set.get(key) {
+                Some((blocks, position)) => {
+                    let mut data = vec![];
+                    for (index, b) in blocks.iter().enumerate() {
+                        let mut data_len = KV_BLOCK_SIZE;
+                        if index == blocks.len() - 1 {
+                            data_len = position.clone();
+                        }
+                        let stable_position = layout::with_mut(|layout| {
+                            layout.get_position(b.clone(), 0)
+                        });
+
+                        data.extend(load_from_stable(stable_position, data_len as usize))
+                    }
+                    Ok(data)
+                }
+                None => Err(KvError::InvalidKey)
+            }
         }
 
+        pub fn get_content_size(&self, key: &String) -> u64 {
+            match self.kv_set.get(key) {
+                None => { 0u64 }
+                Some((blocks, position)) => {
+                    (blocks.len() - 1) as u64 * KV_BLOCK_SIZE + position.clone()
+                }
+            }
+        }
         // ==================================================================================================
         // private
         // ==================================================================================================
-        // fn _check_self_bytes_len(&self) {
-        //     let bytes = bincode::serialize::<Bucket>(&self).unwrap();
-        //     if bytes.len() as u64 >= RESERVED_SPACE {
-        //         assert!(false)
-        //     }
-        // }
-        //
-        // fn _update_self_to_stable(&mut self) {
-        //     let bytes = bincode::serialize::<Bucket>(&self).unwrap();
-        //     let bytes_len = bytes.len() as u64;
-        //     self._grow_stable_memory_page(0);
-        //     let len_bytes = Vec::from(bytes_len.to_be_bytes());
-        //
-        //     self._storage_data(0, len_bytes.clone());
-        //     self._storage_data(8, bytes);
-        // }
-        //
-        // fn _update_self_from_stable(&mut self) {
-        //     let bucket_len_bytes: [u8; 8] = self._load_from_sm((0, 8))[..8]
-        //         .try_into()
-        //         .expect("update_self_from_stable : slice with incorrect length");
-        //     let bucket_len = u64::from_be_bytes(bucket_len_bytes);
-        //
-        //     let bucket_bytes = self._load_from_sm((8, bucket_len));
-        //     let new_bucket: Bucket = bincode::deserialize(&bucket_bytes).unwrap();
-        //     *self = new_bucket;
-        // }
-        //
-        // fn _load_from_sm(&self, field: (u64, u64)) -> Vec<u8> {
-        //     let mut buf = [0].repeat(field.1 as usize);
-        //     stable::stable64_read(field.0, &mut buf);
-        //     buf.clone()
-        // }
-        //
-        // fn _get_field(&mut self, total_size: u64) -> Result<(u64, u64), Error> {
-        //     match self._inspect_size(total_size.clone()) {
-        //         Err(err) => Err(err),
-        //         Ok(..) => {
-        //             let field = (self.offset.clone(), total_size.clone());
-        //             self._grow_stable_memory_page(total_size.clone());
-        //             self.offset += total_size;
-        //             Ok(field)
-        //         }
-        //     }
-        // }
-        //
-        // // check total_size
-        // fn _inspect_size(&self, total_size: u64) -> Result<(), Error> {
-        //     if total_size <= self._get_available_memory_size() {
-        //         Ok(())
-        //     } else {
-        //         Err(Error::InsufficientMemory)
-        //     }
-        // }
-        //
-        // // When uploading, write data in the form of vals according to the assigned write_page
-        // fn _storage_data(&self, start: u64, data: Vec<u8>) {
-        //     stable::stable64_write(start, data.as_slice());
-        // }
+        fn _insert_data(&mut self, value: Vec<u8>) -> Result<(Vec<u64>, u64), KvError> {
+            let mut blocks = vec![];
+            let mut value = value;
+            let mut position: usize = layout::KV_BLOCK_SIZE as usize;
 
+            while value.len() > 0 {
+                position = 0;
+                //分配新块
+                match layout::with_mut(|layout| layout.new_block()) {
+                    Ok(block_number) => {
+                        // 添加到kv
+                        api::print(format!("new block number:{}", block_number.clone()));
+                        blocks.push(block_number);
+                    }
+                    Err(err) => return Err(err)
+                }
 
+                let stable_position = layout::with_mut(|layout| {
+                    layout.get_position(blocks[blocks.len() - 1], 0u64)
+                });
+
+                api::print(format!("insert data, stable_position:{}", stable_position));
+
+                let storage_data_len = min((layout::KV_BLOCK_SIZE) as usize, value.len());
+
+                api::print(format!("insert data, storage_data_len:{}", storage_data_len));
+
+                storage_data(stable_position, value[0..storage_data_len].to_vec());
+                value = value[storage_data_len..].to_vec();
+                position += storage_data_len;
+
+                if layout::KV_BLOCK_SIZE > position as u64 {
+                    break;
+                }
+            }
+
+            // api::print(format!("insert blocks: {:?}", blocks));
+            Ok((blocks, position as u64))
+        }
     }
-
 }
 
-    // ==================================================================================================
-    // test code
-    // ==================================================================================================
-    // #[allow(dead_code)]
-    // pub fn insert_test(key: String) {
-    //     BUCKET.with(|bucket| {
-    //         let mut bucket = bucket.borrow_mut();
-    //
-    //         let field = (1000000000000, 100000000000000);
-    //         match bucket.assets.get_mut(&key) {
-    //             None => {
-    //                 bucket.assets.insert(key.clone(), vec![field.clone()]);
-    //             }
-    //             Some(pre_field) => {
-    //                 pre_field.push(field.clone());
-    //             }
-    //         }
-    //         bucket._check_self_bytes_len();
-    //     });
-    // }
+// ==================================================================================================
+// core api
+// ==================================================================================================
+pub fn get_size(key: &String) -> u64 {
+    kv::with(|kv| kv.get_content_size(key))
+}
 
+pub fn get(key: &String) -> Result<Vec<u8>, KvError> {
+    kv::with(|kv| kv.get(key))
+}
 
+pub fn put(key: &String, value: Vec<u8>) -> Result<(), KvError> {
+    kv::with_mut(|kv| kv.put(key, value))
+}
 
-// pub fn write(key: String, value: Vec<u8>) -> Result<(), Error>{
-//     Ok(())
-// }
-//
-// pub fn read(key: String) -> Result<Vec<Vec<u8>>, Error>{
-//     Ok(vec![])
-// }
-//
-// pub fn del_key(key: String){
-//
-// }
-//
-// pub fn seek(key : String, positon: u64) -> Result<(), Error>{
-//     Ok(())
-// }
+pub fn append(key: &String, value: Vec<u8>) -> Result<(), KvError> {
+    kv::with_mut(|kv| kv.append(key, value))
+}
 
-// query
+pub fn del(key: &String) {
+    kv::with_mut(|kv| kv.del(key))
+}
+
+pub fn get_keys() -> Vec<String> {
+    kv::with(|kv| kv.get_keys())
+}
+
+//查询
+pub fn get_available_space_size() -> u64 {
+    layout::with(|layout| layout.get_available_memory_size())
+}
+
+// ==================================================================================================
+// upgrade
+// ==================================================================================================
+// NOTE:
+// If you plan to store gigabytes of state and upgrade the code,
+// Using put interface is a good option to consider
+pub fn pre_upgrade() {
+    _update_self_to_stable();
+}
+
+pub fn post_upgrade() {
+    _update_self_from_stable();
+}
+
+fn _update_self_to_stable() {
+    let stable_struct = StableStruct {
+        layout: layout::with(|layout| { layout.clone() }),
+        kv: kv::with(|kv| { kv.clone() }),
+    };
+
+    let bytes = bincode::serialize::<StableStruct>(&stable_struct).unwrap();
+    let bytes_len = bytes.len() as u64;
+    if let Err(_err) = stable::stable_grow_memory_page(0) {
+        assert!(false)
+    }
+
+    let len_bytes = Vec::from(bytes_len.to_be_bytes());
+    storage_data(0, len_bytes.clone());
+    storage_data(8, bytes);
+}
+
+fn _update_self_from_stable() {
+    let bucket_len_bytes: [u8; 8] = load_from_stable(0, 8)[..8]
+        .try_into()
+        .expect("update_self_from_stable : slice with incorrect length");
+
+    let bucket_len = u64::from_be_bytes(bucket_len_bytes);
+
+    let bucket_bytes = load_from_stable(8, bucket_len as usize);
+    let new_stable_struct: StableStruct = bincode::deserialize(&bucket_bytes).unwrap();
+
+    kv::with_mut(|kv| *kv = new_stable_struct.kv);
+    layout::with_mut(|layout| *layout = new_stable_struct.layout);
+}
+
+#[test]
+fn test_put() {}
+
+#[test]
+fn test_get() {}
+
+#[test]
+fn test_put_get() {}
+
+#[test]
+fn get_available_size() {
+    get_available_space_size();
+}
+
