@@ -1,5 +1,0 @@
-service : () -> {
-  checkData : (nat8, nat8) -> ();
-  uploadBigData : (nat32) -> ();
-  uploadData : (nat) -> ();
-}

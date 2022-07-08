@@ -1,5 +1,5 @@
 [package]
-name = "bucket"
+name = "kv"
 version = "0.1.0"
 edition = "2021"
 authors = ["Xingwu Wang <wxw1198@gmail.com>"]

@@ -8,11 +8,8 @@ use crate::{layout, stable};
 mod kv {
     use super::*;
     use std::cmp::min;
-    use ic_cdk::api;
 
-    thread_local!(
-        static KV: RefCell<Kv> = RefCell::new(Kv::default());
-    );
+    thread_local!(static KV: RefCell<Kv> = RefCell::new(Kv::default()));
 
     pub fn with<T, F: FnOnce(&Kv) -> T>(f: F) -> T {
         KV.with(|kv| f(&kv.borrow()))
@@ -32,22 +29,17 @@ mod kv {
             let value = self.kv_set.remove(key);
 
             if let Some((blocks, _)) = value {
-                for block in blocks {
-                    layout::with_mut(|layout| {
-                        layout.free_block(block);
-                    });
-                }
+                layout::with_mut(|layout| {
+                    layout.free_blocks(blocks);
+                });
             }
         }
 
         pub fn append(&mut self, key: &String, value: Vec<u8>) -> Result<(), KvError> {
             let mut value = value;
 
-            api::print(format!("append ----- , key:{}, value:{:?}", key, self.kv_set.get(key)));
-
             match self.kv_set.get_mut(key) {
                 Some((blocks, position)) => {
-                    api::print(format!("existed old :{:?}, {}", blocks, position));
 
                     //剩余空间可以存储全部新来的数据
                     let stable_position = layout::with_mut(|layout| {
@@ -75,7 +67,6 @@ mod kv {
 
             let (blocks, position) = self.kv_set.get_mut(key).unwrap();
             blocks.extend(new_blocks.clone());
-            // api::print(format!("new blocks: {:?}", new_blocks));
             *position = new_position;
             Ok(())
         }
@@ -127,42 +118,34 @@ mod kv {
         // private
         // ==================================================================================================
         fn _insert_data(&mut self, value: Vec<u8>) -> Result<(Vec<u64>, u64), KvError> {
-            let mut blocks = vec![];
             let mut value = value;
             let mut position: usize = layout::KV_BLOCK_SIZE as usize;
 
-            while value.len() > 0 {
-                position = 0;
+            let need_block_count = if value.len() as u64 % layout::KV_BLOCK_SIZE == 0 {
+                value.len() as u64 / layout::KV_BLOCK_SIZE
+            } else {
+                value.len() as u64 / layout::KV_BLOCK_SIZE + 1
+            };
+
+            let blocks = match layout::with_mut(|layout| layout.new_blocks(need_block_count)) {
+                Ok(new_blocks) => { new_blocks }
+                Err(err) => return Err(err)
+            };
+
+            for block in &blocks {
                 //分配新块
-                match layout::with_mut(|layout| layout.new_block()) {
-                    Ok(block_number) => {
-                        // 添加到kv
-                        api::print(format!("new block number:{}", block_number.clone()));
-                        blocks.push(block_number);
-                    }
-                    Err(err) => return Err(err)
-                }
-
                 let stable_position = layout::with_mut(|layout| {
-                    layout.get_position(blocks[blocks.len() - 1], 0u64)
+                    layout.get_position(block.clone(), 0u64)
                 });
-
-                api::print(format!("insert data, stable_position:{}", stable_position));
 
                 let storage_data_len = min((layout::KV_BLOCK_SIZE) as usize, value.len());
 
-                api::print(format!("insert data, storage_data_len:{}", storage_data_len));
-
                 storage_data(stable_position, value[0..storage_data_len].to_vec());
                 value = value[storage_data_len..].to_vec();
-                position += storage_data_len;
-
-                if layout::KV_BLOCK_SIZE > position as u64 {
-                    break;
-                }
+                position = storage_data_len;
             }
+            assert_eq!(value.len(), 0);
 
-            // api::print(format!("insert blocks: {:?}", blocks));
             Ok((blocks, position as u64))
         }
     }
@@ -198,6 +181,10 @@ pub fn get_keys() -> Vec<String> {
 //查询
 pub fn get_available_space_size() -> u64 {
     layout::with(|layout| layout.get_available_memory_size())
+}
+
+pub fn get_bit_map() -> Vec<u8> {
+    layout::with(|layout| layout.bit_map())
 }
 
 // ==================================================================================================

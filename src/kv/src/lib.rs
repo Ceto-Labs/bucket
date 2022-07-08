@@ -4,4 +4,3 @@ mod layout;
 mod stable;
 
 pub use kv::*;
-pub use types::Kv;

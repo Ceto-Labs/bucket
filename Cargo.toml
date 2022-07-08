@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "src/bucket",
+    "src/kv",
     "example"
 ]
