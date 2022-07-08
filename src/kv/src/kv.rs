@@ -4,7 +4,6 @@ use crate::stable::*;
 use bincode;
 use std::cell::RefCell;
 use crate::{layout, stable};
-// use serde::{Deserialize, Serialize};
 
 mod kv {
     use super::*;
@@ -30,8 +29,7 @@ mod kv {
         }
 
         pub fn get_index_space(&self) -> u64 {
-            let used = _get_upgrade_data();
-            used.len() as u64
+            _get_upgrade_data().len() as u64
         }
 
         pub fn get_keys(&self) -> Vec<String> {
@@ -189,13 +187,9 @@ pub fn get(key: &String) -> Result<Vec<u8>, KvError> {
     kv::with(|kv| kv.get(key))
 }
 
-pub fn put(key: &String, value: Vec<u8>) -> Result<(), KvError> {
-    kv::with_mut(|kv| kv.put(key, value))
-}
+pub fn put(key: &String, value: Vec<u8>) -> Result<(), KvError> { kv::with_mut(|kv| kv.put(key, value)) }
 
-pub fn append(key: &String, value: Vec<u8>) -> Result<(), KvError> {
-    kv::with_mut(|kv| kv.append(key, value))
-}
+pub fn append(key: &String, value: Vec<u8>) -> Result<(), KvError> { kv::with_mut(|kv| kv.append(key, value)) }
 
 pub fn del(key: &String) {
     kv::with_mut(|kv| kv.del(key))
@@ -206,28 +200,21 @@ pub fn get_keys() -> Vec<String> {
 }
 
 //查询stable还有多少可供使用的存储空间
-pub fn get_available_space_size() -> u64 {
-    layout::with(|layout| layout.get_available_memory_size())
-}
+pub fn get_available_space_size() -> u64 { layout::with(|layout| layout.get_available_memory_size() }
+
 //以kv的视角，查询空间使用情况
 pub fn get_bit_map() -> Vec<u8> {
     layout::with(|layout| layout.bit_map())
 }
 
 //存储库是否能够正常升级
-pub fn check_upgrade() -> bool {
-    kv::with(|kv| kv.check_upgrade())
-}
+pub fn check_upgrade() -> bool { kv::with(|kv| kv.check_upgrade()) }
 
 // 升级时，索引需要的存储空间
-pub fn get_index_space() -> u64 {
-    kv::with(|kv| kv.get_index_space())
-}
+pub fn get_index_space() -> u64 { kv::with(|kv| kv.get_index_space()) }
 
 //kv库的空间利用率
-pub fn get_utilization() -> f64 {
-    kv::with(|kv| kv.get_utilization())
-}
+pub fn get_utilization() -> f64 { kv::with(|kv| kv.get_utilization()) }
 
 // ==================================================================================================
 // upgrade

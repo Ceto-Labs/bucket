@@ -18,7 +18,7 @@ pub struct Kv {
 #[derive(CandidType, Deserialize, Serialize, Clone)]
 pub struct Layout {
     pub(crate) stable_blocks_count: u64,
-    pub(crate) bit_map: Vec<u8>,//8*10>>30/512s
+    pub(crate) bit_map: Vec<u8>,
     pub(crate) kv_block_size : u64,
 }
 
