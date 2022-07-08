@@ -6,7 +6,7 @@ use std::cell::RefCell;
 static THRESHOLD: u64 = 8589934592;
 
 //从0自己开始预留20MB,用于存储元数据
-static RESERVED_SPACE: u64 = RESERVED_PAGE * MAX_PAGE_BYTE;
+pub static RESERVED_SPACE: u64 = RESERVED_PAGE * MAX_PAGE_BYTE / 512 * KV_BLOCK_SIZE;
 
 //ic stable每个页大小
 static MAX_PAGE_BYTE: u64 = 65536;

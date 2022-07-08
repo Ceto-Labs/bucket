@@ -46,7 +46,7 @@ fn init() {
 
 #[ic_cdk_macros::query]
 fn greet(name: String) -> String {
-    format!("Hello chbi,44 {}!", name)
+    format!("Hello chbi,4455 {}!", name)
 }
 
 // NOTE:
@@ -83,6 +83,18 @@ fn post_upgrade() {
 ////////////////////////////////////////////////////////////
 // test api
 ////////////////////////////////////////////////////////////
+
+#[update(name = "getIndexSpace")]
+#[candid_method(query, rename = "getIndexSpace")]
+fn get_upgrade_left_space() -> u64 {
+    kv::get_index_space()
+}
+
+#[update(name = "getUtilization")]
+#[candid_method(query, rename = "getUtilization")]
+fn get_utilization() -> f64 {
+    kv::get_utilization()
+}
 
 #[update(name = "checkBitMap")]
 #[candid_method(query, rename = "checkBitMap")]
@@ -189,7 +201,7 @@ fn check_single_data(index: Nat) {
     let name = format!("{}.png", index.0.to_u32().unwrap() as u8);
 
     if kv::get_size(&name) != WRITE_COUNT * WRITE_BLOCK_SIZE {
-        api::print(format!("check data, key size:{} KB,{} KB", kv::get_size(&name)/1024, WRITE_COUNT * WRITE_BLOCK_SIZE / 1024));
+        api::print(format!("check data, key size:{} KB,{} KB", kv::get_size(&name) / 1024, WRITE_COUNT * WRITE_BLOCK_SIZE / 1024));
         assert!(false)
     }
 
@@ -213,13 +225,10 @@ fn check_single_data(index: Nat) {
 }
 
 #[query]
-fn test_upgrade() -> usize {
-    let metadata = NFTINFO.with(|nft_info| {
+fn check_upgrade() -> NftInfo {
+    NFTINFO.with(|nft_info| {
         nft_info.borrow().clone()
-    });
-
-    let buf = Encode!(&metadata).unwrap();
-    buf.len()
+    })
 }
 
 ////////////////////////////////////////////////////////////

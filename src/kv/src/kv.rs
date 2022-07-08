@@ -4,6 +4,7 @@ use crate::stable::*;
 use bincode;
 use std::cell::RefCell;
 use crate::{layout, stable};
+// use serde::{Deserialize, Serialize};
 
 mod kv {
     use super::*;
@@ -20,6 +21,19 @@ mod kv {
     }
 
     impl Kv {
+        pub fn check_upgrade(&self) -> bool {
+            let len = _get_upgrade_data().len();
+            if 8 + len as u64 >= layout::RESERVED_SPACE {
+                return false;
+            }
+            return true;
+        }
+
+        pub fn get_index_space(&self) -> u64 {
+            let used = _get_upgrade_data();
+            used.len() as u64
+        }
+
         pub fn get_keys(&self) -> Vec<String> {
             self.kv_set.clone().into_keys().collect()
         }
@@ -114,9 +128,22 @@ mod kv {
                 }
             }
         }
+
+        pub fn get_utilization(&self) -> f64 {
+            let mut block_count = 0;
+            let mut unused_space = 0;
+            for (_key, (blocks, position)) in &self.kv_set {
+                block_count += blocks.len();
+                unused_space += KV_BLOCK_SIZE - *position;
+            }
+
+            (1f64 - (unused_space as f64) / (block_count as u64 * KV_BLOCK_SIZE) as f64) * 100f64
+        }
         // ==================================================================================================
         // private
         // ==================================================================================================
+        // 经常检查，会消耗大量cycle
+
         fn _insert_data(&mut self, value: Vec<u8>) -> Result<(Vec<u64>, u64), KvError> {
             let mut value = value;
             let mut position: usize = layout::KV_BLOCK_SIZE as usize;
@@ -187,6 +214,19 @@ pub fn get_bit_map() -> Vec<u8> {
     layout::with(|layout| layout.bit_map())
 }
 
+//
+pub fn check_upgrade() -> bool {
+    kv::with(|kv| kv.check_upgrade())
+}
+
+pub fn get_index_space() -> u64 {
+    kv::with(|kv| kv.get_index_space())
+}
+
+pub fn get_utilization() -> f64 {
+    kv::with(|kv| kv.get_utilization())
+}
+
 // ==================================================================================================
 // upgrade
 // ==================================================================================================
@@ -202,13 +242,13 @@ pub fn post_upgrade() {
 }
 
 fn _update_self_to_stable() {
-    let stable_struct = StableStruct {
-        layout: layout::with(|layout| { layout.clone() }),
-        kv: kv::with(|kv| { kv.clone() }),
-    };
-
-    let bytes = bincode::serialize::<StableStruct>(&stable_struct).unwrap();
+    let bytes = _get_upgrade_data();
     let bytes_len = bytes.len() as u64;
+
+    if 8 + bytes_len >= layout::RESERVED_SPACE {
+        assert!(false);
+    }
+
     if let Err(_err) = stable::stable_grow_memory_page(0) {
         assert!(false)
     }
@@ -231,6 +271,16 @@ fn _update_self_from_stable() {
     kv::with_mut(|kv| *kv = new_stable_struct.kv);
     layout::with_mut(|layout| *layout = new_stable_struct.layout);
 }
+
+fn _get_upgrade_data() -> Vec<u8> {
+    let stable_struct = StableStruct {
+        layout: layout::with(|layout| { layout.clone() }),
+        kv: kv::with(|kv| { kv.clone() }),
+    };
+
+    bincode::serialize::<StableStruct>(&stable_struct).unwrap()
+}
+
 
 #[test]
 fn test_put() {}
