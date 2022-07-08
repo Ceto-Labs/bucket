@@ -205,24 +205,26 @@ pub fn get_keys() -> Vec<String> {
     kv::with(|kv| kv.get_keys())
 }
 
-//查询
+//查询stable还有多少可供使用的存储空间
 pub fn get_available_space_size() -> u64 {
     layout::with(|layout| layout.get_available_memory_size())
 }
-
+//以kv的视角，查询空间使用情况
 pub fn get_bit_map() -> Vec<u8> {
     layout::with(|layout| layout.bit_map())
 }
 
-//
+//存储库是否能够正常升级
 pub fn check_upgrade() -> bool {
     kv::with(|kv| kv.check_upgrade())
 }
 
+// 升级时，索引需要的存储空间
 pub fn get_index_space() -> u64 {
     kv::with(|kv| kv.get_index_space())
 }
 
+//kv库的空间利用率
 pub fn get_utilization() -> f64 {
     kv::with(|kv| kv.get_utilization())
 }
