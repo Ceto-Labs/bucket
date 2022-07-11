@@ -100,8 +100,11 @@ fn get_utilization() -> f64 {
 #[candid_method(query, rename = "checkBitMap")]
 fn check_bit_map() -> String {
     let old_map = kv::get_bit_map();
+    let old_avail_space = kv::get_available_space_size();
+
     let key = "test_bit_map_key".to_string();
-    let ret = kv::put(&key, vec!(2; 1024 * 782));
+    let write_len = 1024 * 11;
+    let ret = kv::put(&key, vec!(2; write_len as usize));
     match ret {
         Ok(..) => {}
         Err(err) => {
@@ -109,6 +112,11 @@ fn check_bit_map() -> String {
             assert!(false)
         }
     }
+
+    let new_avali_space = kv::get_available_space_size();
+
+    // space
+    assert_eq!(new_avali_space + write_len , old_avail_space);
 
     kv::del(&key);
 

@@ -108,7 +108,7 @@ impl Layout {
             }
         }
 
-        THRESHOLD - self.stable_blocks_count * MAX_PAGE_BYTE + left_block_size * MAX_PAGE_BYTE
+        THRESHOLD - self.stable_blocks_count * MAX_PAGE_BYTE + left_block_size * KV_BLOCK_SIZE
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
